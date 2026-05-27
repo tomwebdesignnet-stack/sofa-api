@@ -34,7 +34,7 @@ async function getBrowser() {
   return browser
 }
 
-app.get("*", async (req, res) => {
+app.use(async (req, res) => {
 
   try {
 
@@ -106,9 +106,7 @@ app.get("*", async (req, res) => {
 
     res.status(500).json({
 
-      erro: err.message,
-
-      stack: err.stack
+      erro: err.message
     })
   }
 })
