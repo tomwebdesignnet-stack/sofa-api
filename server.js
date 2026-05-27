@@ -1,6 +1,10 @@
 import express from "express"
 import cors from "cors"
-import { chromium } from "playwright"
+
+import playwright from "playwright-extra"
+import stealth from "puppeteer-extra-plugin-stealth"
+
+playwright.use(stealth())
 
 const app = express()
 
@@ -14,8 +18,18 @@ async function getBrowser() {
 
   if (!browser) {
 
-    browser = await chromium.launch({
-      headless: true
+    browser = await playwright.chromium.launch({
+
+      headless: true,
+
+      args: [
+
+        "--no-sandbox",
+
+        "--disable-setuid-sandbox",
+
+        "--disable-blink-features=AutomationControlled"
+      ]
     })
   }
 
@@ -44,10 +58,17 @@ app.get("*", async (req, res) => {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     })
 
+    await page.goto(
+      "https://www.sofascore.com",
+      {
+        waitUntil: "domcontentloaded"
+      }
+    )
+
     const url =
       `https://www.sofascore.com/api/v1/${endpoint}`
 
-    const data = await page.evaluate(async (url) => {
+    const result = await page.evaluate(async (url) => {
 
       const response = await fetch(url, {
 
@@ -64,8 +85,10 @@ app.get("*", async (req, res) => {
       })
 
       return {
+
         status: response.status,
-        body: await response.text()
+
+        text: await response.text()
       }
 
     }, url)
@@ -77,7 +100,7 @@ app.get("*", async (req, res) => {
       "application/json"
     )
 
-    res.send(data.body)
+    res.send(result.text)
 
   } catch (err) {
 
@@ -85,6 +108,12 @@ app.get("*", async (req, res) => {
       erro: err.message
     })
   }
+})
+
+app.listen(PORT, () => {
+
+  console.log("Servidor online")
+})
 })
 
 app.listen(PORT, () => {
