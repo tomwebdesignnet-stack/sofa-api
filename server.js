@@ -1,28 +1,116 @@
-const { chromium } = require('playwright-extra');
-const stealth = require('puppeteer-extra-plugin-stealth')();
+import express from "express"
+import cors from "cors"
 
-// Adiciona o plugin stealth ao Playwright
-chromium.use(stealth);
+import playwright from "playwright-extra"
+import stealth from "puppeteer-extra-plugin-stealth"
 
-async function buscarDados() {
-    // Inicializa o navegador com o stealth ativado
-    const browser = await chromium.launch({ 
-        headless: true, // Precisa ser true na Render
-        args: [
-            '--no-sandbox', 
-            '--disable-setuid-sandbox',
-            '--disable-blink-features=AutomationControlled' // Remove a bandeira de automação
-        ]
-    });
-    
-    const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', // User-agent moderno de humano
-        viewport: { width: 1280, height: 720 }
-    });
+playwright.use(stealth())
 
-    const page = await context.newPage();
-    
-    // Seu código de navegação aqui...
-    // await page.goto('https://sofascore.com...');
+const app = express()
+
+app.use(cors())
+
+const PORT = process.env.PORT || 3000
+
+let browser
+
+async function getBrowser() {
+
+  if (!browser) {
+
+    browser = await playwright.chromium.launch({
+
+      headless: true,
+
+      args: [
+
+        "--no-sandbox",
+
+        "--disable-setuid-sandbox",
+
+        "--disable-blink-features=AutomationControlled"
+      ]
+    })
+  }
+
+  return browser
 }
 
+app.get("*", async (req, res) => {
+
+  try {
+
+    const endpoint =
+      req.path.replace(/^\/+/, "")
+
+    if (!endpoint) {
+
+      return res.status(400).json({
+        erro: "endpoint vazio"
+      })
+    }
+
+    const browser = await getBrowser()
+
+    const page = await browser.newPage({
+
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+    })
+
+    await page.goto(
+      "https://www.sofascore.com",
+      {
+        waitUntil: "domcontentloaded"
+      }
+    )
+
+    const url =
+      `https://www.sofascore.com/api/v1/${endpoint}`
+
+    const result = await page.evaluate(async (url) => {
+
+      const response = await fetch(url, {
+
+        headers: {
+
+          "Accept": "*/*",
+
+          "Referer":
+            "https://www.sofascore.com/",
+
+          "Origin":
+            "https://www.sofascore.com"
+        }
+      })
+
+      return {
+
+        status: response.status,
+
+        text: await response.text()
+      }
+
+    }, url)
+
+    await page.close()
+
+    res.setHeader(
+      "Content-Type",
+      "application/json"
+    )
+
+    res.send(result.text)
+
+  } catch (err) {
+
+    res.status(500).json({
+      erro: err.message
+    })
+  }
+})
+
+app.listen(PORT, () => {
+
+  console.log("Servidor online")
+})
