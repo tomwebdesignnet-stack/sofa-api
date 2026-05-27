@@ -1,5 +1,6 @@
 import express from "express"
 import cors from "cors"
+import { chromium } from "playwright"
 
 const app = express()
 
@@ -7,8 +8,19 @@ app.use(cors())
 
 const PORT = process.env.PORT || 3000
 
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+let browser
+
+async function getBrowser() {
+
+  if (!browser) {
+
+    browser = await chromium.launch({
+      headless: true
+    })
+  }
+
+  return browser
+}
 
 app.get("*", async (req, res) => {
 
@@ -17,37 +29,55 @@ app.get("*", async (req, res) => {
     const endpoint =
       req.path.replace(/^\/+/, "")
 
+    if (!endpoint) {
+
+      return res.status(400).json({
+        erro: "endpoint vazio"
+      })
+    }
+
+    const browser = await getBrowser()
+
+    const page = await browser.newPage({
+
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+    })
+
     const url =
       `https://www.sofascore.com/api/v1/${endpoint}`
 
-    const response = await fetch(url, {
+    const data = await page.evaluate(async (url) => {
 
-      headers: {
+      const response = await fetch(url, {
 
-        "User-Agent": USER_AGENT,
+        headers: {
 
-        "Accept": "*/*",
+          "Accept": "*/*",
 
-        "Accept-Language":
-          "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+          "Referer":
+            "https://www.sofascore.com/",
 
-        "Referer":
-          "https://www.sofascore.com/",
+          "Origin":
+            "https://www.sofascore.com"
+        }
+      })
 
-        "Origin":
-          "https://www.sofascore.com"
+      return {
+        status: response.status,
+        body: await response.text()
       }
-    })
 
-    const data = await response.text()
+    }, url)
+
+    await page.close()
 
     res.setHeader(
       "Content-Type",
-      response.headers.get("content-type") ||
       "application/json"
     )
 
-    res.send(data)
+    res.send(data.body)
 
   } catch (err) {
 
@@ -58,5 +88,6 @@ app.get("*", async (req, res) => {
 })
 
 app.listen(PORT, () => {
+
   console.log("Servidor online")
 })
