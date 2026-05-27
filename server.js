@@ -1,10 +1,6 @@
 import express from "express"
 import cors from "cors"
-
-import playwright from "playwright-extra"
-import stealth from "puppeteer-extra-plugin-stealth"
-
-playwright.use(stealth())
+import { chromium } from "playwright"
 
 const app = express()
 
@@ -18,7 +14,7 @@ async function getBrowser() {
 
   if (!browser) {
 
-    browser = await playwright.chromium.launch({
+    browser = await chromium.launch({
 
       headless: true,
 
@@ -27,6 +23,8 @@ async function getBrowser() {
         "--no-sandbox",
 
         "--disable-setuid-sandbox",
+
+        "--disable-dev-shm-usage",
 
         "--disable-blink-features=AutomationControlled"
       ]
@@ -104,13 +102,18 @@ app.get("*", async (req, res) => {
 
   } catch (err) {
 
+    console.error(err)
+
     res.status(500).json({
-      erro: err.message
+
+      erro: err.message,
+
+      stack: err.stack
     })
   }
 })
 
 app.listen(PORT, () => {
 
-  console.log("Servidor online")
+  console.log(`Servidor online na porta ${PORT}`)
 })
